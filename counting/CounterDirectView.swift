@@ -127,6 +127,13 @@ struct CounterDetailContent: View {
     let onSelect: (UUID) -> Void
     @Environment(\.modelContext) private var modelContext
     
+    private var lastIncrementDate: Date? {
+        counter.logs
+            .filter { $0.delta > 0 }
+            .map(\.timestamp)
+            .max()
+    }
+    
     var body: some View {
         ZStack {
             Color(UIColor.systemGroupedBackground).ignoresSafeArea()
@@ -140,6 +147,15 @@ struct CounterDetailContent: View {
                     .font(.system(size: 120, weight: .black, design: .rounded))
                     .contentTransition(.numericText())
                     .animation(.spring(), value: counter.totalCount)
+                
+                VStack(spacing: 4) {
+                    TimelineView(.periodic(from: .now, by: 0.1)) { context in
+                        Text(formatElapsedTime(since: lastIncrementDate, now: context.date))
+                            .font(.system(.title3, design: .monospaced))
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                    }
+                }
                 
                 Text("Tap +1  ·  Long Press -1")
                     .font(.caption)
@@ -164,6 +180,15 @@ struct CounterDetailContent: View {
         if delta > 0 {
             ScreenAwakeManager.shared.markCounterActivity()
         }
+    }
+    
+    private func formatElapsedTime(since start: Date?, now: Date) -> String {
+        guard let start else { return "00:00.0" }
+        let elapsed = max(0, now.timeIntervalSince(start))
+        let minutes = Int(elapsed) / 60
+        let seconds = Int(elapsed) % 60
+        let tenths = Int((elapsed * 10).truncatingRemainder(dividingBy: 10))
+        return String(format: "%02d:%02d.%d", minutes, seconds, tenths)
     }
     
 }
