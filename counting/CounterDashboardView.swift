@@ -8,9 +8,9 @@ struct CounterDashboardView: View {
     @State private var newCounterName = ""
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
-                Color(UIColor.systemGroupedBackground).ignoresSafeArea()
+                Color(UIColor.systemGroupedBackground).ignoresSafeArea(edges: .bottom)
                 
                 if counters.isEmpty {
                     ContentUnavailableView("No Counters", systemImage: "number.circle", description: Text("Add a new counter to get started (e.g., 'Run Baal')"))
@@ -36,7 +36,7 @@ struct CounterDashboardView: View {
                 }
             }
             .sheet(isPresented: $showingAddCounter) {
-                NavigationView {
+                NavigationStack {
                     Form {
                         TextField("Counter Name", text: $newCounterName)
                     }
@@ -181,7 +181,7 @@ struct CounterDetailView: View {
             .padding(.bottom, 40)
         }
         .navigationBarTitleDisplayMode(.inline)
-        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
+        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea(edges: .bottom))
     }
     
     private func logDelta(_ delta: Int) {

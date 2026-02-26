@@ -19,7 +19,7 @@ struct CounterStatisticsView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 Section(header: Text("Overview")) {
                     statRow(title: "Total Count", value: "\(counter.totalCount)")
@@ -97,7 +97,7 @@ struct TimerStatisticsView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 Section(header: Text("Overview")) {
                     statRow(title: "Session Count", value: "\(sessions.count)")

@@ -14,7 +14,7 @@ struct ManagementView: View {
     @State private var newName: String = ""
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 Section(header: Text("Counters")) {
                     ForEach(counters) { counter in

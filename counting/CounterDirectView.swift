@@ -18,9 +18,9 @@ struct CounterDirectView: View {
     @State private var showingCounterStats = false
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
-                Color(UIColor.systemGroupedBackground).ignoresSafeArea()
+                Color(UIColor.systemGroupedBackground).ignoresSafeArea(edges: .bottom)
                 
                 if counters.isEmpty {
                     VStack(spacing: 20) {
@@ -136,7 +136,7 @@ struct CounterDetailContent: View {
     
     var body: some View {
         ZStack {
-            Color(UIColor.systemGroupedBackground).ignoresSafeArea()
+            Color(UIColor.systemGroupedBackground).ignoresSafeArea(edges: .bottom)
             
             VStack(spacing: 16) {
                 Text(counter.name)

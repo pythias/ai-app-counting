@@ -30,9 +30,9 @@ struct TimerDashboardView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
-                Color(UIColor.systemGroupedBackground).ignoresSafeArea()
+                Color(UIColor.systemGroupedBackground).ignoresSafeArea(edges: .bottom)
                 
                 VStack(spacing: 24) {
                     Text(activeTimerTitle.uppercased())
@@ -122,7 +122,7 @@ struct TimerDashboardView: View {
                 if let item = selectedTimer {
                     TimerStatisticsView(timerItem: item, sessions: sessions.filter { $0.item?.id == item.id })
                 } else {
-                    NavigationView {
+                    NavigationStack {
                         ContentUnavailableView("No Timer Selected", systemImage: "timer", description: Text("Select a timer first."))
                             .navigationTitle("Timer Stats")
                             .navigationBarTitleDisplayMode(.inline)
