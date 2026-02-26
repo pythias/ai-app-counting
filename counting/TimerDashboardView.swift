@@ -73,6 +73,7 @@ struct TimerDashboardView: View {
                 resetTimer()
             }
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.visible, for: .navigationBar)
             .onAppear(perform: ensureDefaultTimer)
             .onReceive(timer) { _ in
                 if isRunning {
