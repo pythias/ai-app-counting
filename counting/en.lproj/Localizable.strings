@@ -35,6 +35,13 @@
 "Cancel" = "Cancel";
 "Add" = "Add";
 "Tap +1  ·  Long Press -1" = "Tap +1  ·  Long Press -1";
+"Double Tap starts timing  ·  3-finger swipe down ends phase (+1)" = "Double Tap starts timing  ·  3-finger swipe down ends phase (+1)";
+"Tap +1 restarts timing" = "Tap +1 restarts timing";
+"Long Press toggles timing (End +1 / Start +0)" = "Long Press toggles timing (End +1 / Start +0)";
+"Timing" = "Timing";
+"Paused" = "Paused";
+"Start Next (+0)" = "Start Next (+0)";
+"Long Press ends current timing (+1)" = "Long Press ends current timing (+1)";
 "Since Last +1" = "Since Last +1";
 "My Counter" = "My Counter";
 

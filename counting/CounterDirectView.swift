@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct CounterDirectView: View {
     @Query(sort: \CounterItem.createdAt, order: .reverse) var counters: [CounterItem]
@@ -127,13 +128,10 @@ struct CounterDetailContent: View {
     let counters: [CounterItem]
     let onSelect: (UUID) -> Void
     @Environment(\.modelContext) private var modelContext
-    
-    private var lastIncrementDate: Date? {
-        counter.logs
-            .filter { $0.delta > 0 }
-            .map(\.timestamp)
-            .max()
-    }
+    @State private var isPhaseTiming = false
+    @State private var phaseStartAt: Date?
+    @State private var isCountPulsing = false
+    @State private var isStartButtonPulsing = false
     
     var body: some View {
         ZStack {
@@ -148,29 +146,66 @@ struct CounterDetailContent: View {
                     .font(.system(size: 120, weight: .black, design: .rounded))
                     .contentTransition(.numericText())
                     .animation(.spring(), value: counter.totalCount)
+                    .scaleEffect(isCountPulsing ? 1.08 : 1.0)
+                    .animation(.spring(response: 0.2, dampingFraction: 0.55), value: isCountPulsing)
                 
                 VStack(spacing: 4) {
                     TimelineView(.periodic(from: .now, by: 0.1)) { context in
-                        Text(formatElapsedTime(since: lastIncrementDate, now: context.date))
+                        Text(formatElapsedTime(since: currentElapsedStart, now: context.date))
                             .font(.system(.title3, design: .monospaced))
                             .fontWeight(.semibold)
                             .foregroundColor(.primary)
                     }
                 }
                 
-                Text("Tap +1  ·  Long Press -1")
+                Text(isPhaseTiming ? "Timing" : "Paused")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .fontWeight(.semibold)
+                    .foregroundColor(isPhaseTiming ? .green : .orange)
+                
+                if !isPhaseTiming {
+                    Button(action: startNextPhaseWithoutCount) {
+                        Label("Start Next (+0)", systemImage: "play.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color.blue.opacity(0.12))
+                            .foregroundColor(.blue)
+                            .clipShape(Capsule())
+                    }
+                    .scaleEffect(isStartButtonPulsing ? 1.08 : 1.0)
+                    .animation(.spring(response: 0.24, dampingFraction: 0.6), value: isStartButtonPulsing)
+                }
+                
+                VStack(spacing: 4) {
+                    Text("Tap +1 restarts timing")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("Long Press ends current timing (+1)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
             }
             .padding()
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            logDelta(1)
+            incrementAndRestartTiming()
         }
         .onLongPressGesture(minimumDuration: 0.35) {
-            logDelta(-1)
+            endCurrentPhaseWithLongPress()
         }
+        .onAppear {
+            resetPhaseTimer()
+        }
+        .onChange(of: counter.id) { _, _ in
+            resetPhaseTimer()
+        }
+    }
+    
+    private var currentElapsedStart: Date? {
+        guard isPhaseTiming else { return nil }
+        return phaseStartAt
     }
     
     private func logDelta(_ delta: Int) {
@@ -180,6 +215,64 @@ struct CounterDetailContent: View {
         counter.lastAccessedAt = Date()
         if delta > 0 {
             ScreenAwakeManager.shared.markCounterActivity()
+            playIncrementFeedback()
+        }
+    }
+    
+    private func startPhaseTimer() {
+        guard !isPhaseTiming else { return }
+        isPhaseTiming = true
+        phaseStartAt = Date()
+    }
+    
+    private func restartPhaseTimer() {
+        isPhaseTiming = true
+        phaseStartAt = Date()
+    }
+    
+    private func incrementAndRestartTiming() {
+        logDelta(1)
+        restartPhaseTimer()
+    }
+    
+    private func endCurrentPhaseWithLongPress() {
+        guard isPhaseTiming else { return }
+        endPhase()
+        playPhaseEndFeedback()
+    }
+    
+    private func endPhase() {
+        logDelta(1)
+        resetPhaseTimer()
+    }
+    
+    private func startNextPhaseWithoutCount() {
+        startPhaseTimer()
+        playPhaseStartFeedback()
+    }
+    
+    private func resetPhaseTimer() {
+        isPhaseTiming = false
+        phaseStartAt = nil
+    }
+    
+    private func playIncrementFeedback() {
+        isCountPulsing = true
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            isCountPulsing = false
+        }
+    }
+    
+    private func playPhaseEndFeedback() {
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+    }
+    
+    private func playPhaseStartFeedback() {
+        isStartButtonPulsing = true
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            isStartButtonPulsing = false
         }
     }
     

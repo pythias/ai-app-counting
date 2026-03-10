@@ -35,6 +35,13 @@
 "Cancel" = "取消";
 "Add" = "添加";
 "Tap +1  ·  Long Press -1" = "点击 +1 · 长按 -1";
+"Double Tap starts timing  ·  3-finger swipe down ends phase (+1)" = "双击开始计时 · 三指下滑结束阶段（+1）";
+"Tap +1 restarts timing" = "点击 +1，重新计时";
+"Long Press toggles timing (End +1 / Start +0)" = "长按切换计时（结束 +1 / 开启 +0）";
+"Timing" = "计时中";
+"Paused" = "已暂停";
+"Start Next (+0)" = "开始下一次（+0）";
+"Long Press ends current timing (+1)" = "长按结束当前计时（+1）";
 "Since Last +1" = "距上次 +1";
 "My Counter" = "我的计数器";
 
