@@ -42,6 +42,10 @@
 "Paused" = "Paused";
 "Start Next (+0)" = "Start Next (+0)";
 "Long Press ends current timing (+1)" = "Long Press ends current timing (+1)";
+"Added +1" = "Added +1";
+"Ended and added +1" = "Ended and added +1";
+"Undo" = "Undo";
+"Tap to confirm reset" = "Tap to confirm reset";
 "Since Last +1" = "Since Last +1";
 "My Counter" = "My Counter";
 

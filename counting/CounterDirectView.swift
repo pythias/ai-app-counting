@@ -124,6 +124,14 @@ struct CounterDirectView: View {
 }
 
 struct CounterDetailContent: View {
+    private struct PendingUndoAction {
+        let log: CounterLog
+        let message: String
+        let wasPhaseTiming: Bool
+        let previousPhaseStartAt: Date?
+        let createdAt: Date
+    }
+    
     @Bindable var counter: CounterItem
     let counters: [CounterItem]
     let onSelect: (UUID) -> Void
@@ -132,6 +140,10 @@ struct CounterDetailContent: View {
     @State private var phaseStartAt: Date?
     @State private var isCountPulsing = false
     @State private var isStartButtonPulsing = false
+    @State private var pendingUndoActions: [PendingUndoAction] = []
+    @State private var isUndoVisible = false
+    
+    private let undoRetentionSeconds: TimeInterval = 6
     
     var body: some View {
         ZStack {
@@ -142,14 +154,14 @@ struct CounterDetailContent: View {
                     .font(.headline)
                     .foregroundColor(.secondary)
                 
-                Text("\(counter.totalCount)")
-                    .font(.system(size: 120, weight: .black, design: .rounded))
-                    .contentTransition(.numericText())
-                    .animation(.spring(), value: counter.totalCount)
-                    .scaleEffect(isCountPulsing ? 1.08 : 1.0)
-                    .animation(.spring(response: 0.2, dampingFraction: 0.55), value: isCountPulsing)
-                
-                VStack(spacing: 4) {
+                VStack(spacing: 10) {
+                    Text("\(counter.totalCount)")
+                        .font(.system(size: 120, weight: .black, design: .rounded))
+                        .contentTransition(.numericText())
+                        .animation(.spring(), value: counter.totalCount)
+                        .scaleEffect(isCountPulsing ? 1.08 : 1.0)
+                        .animation(.spring(response: 0.2, dampingFraction: 0.55), value: isCountPulsing)
+                    
                     TimelineView(.periodic(from: .now, by: 0.1)) { context in
                         Text(formatElapsedTime(since: currentElapsedStart, now: context.date))
                             .font(.system(.title3, design: .monospaced))
@@ -157,6 +169,25 @@ struct CounterDetailContent: View {
                             .foregroundColor(.primary)
                     }
                 }
+                .padding(.vertical, 14)
+                .padding(.horizontal, 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(Color(UIColor.secondarySystemGroupedBackground))
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 24))
+                .gesture(
+                    TapGesture()
+                        .exclusively(before: LongPressGesture(minimumDuration: 0.35))
+                        .onEnded { value in
+                            switch value {
+                            case .first:
+                                incrementAndRestartTiming()
+                            case .second:
+                                endCurrentPhaseWithLongPress()
+                            }
+                        }
+                )
                 
                 Text(isPhaseTiming ? "Timing" : "Paused")
                     .font(.caption)
@@ -188,18 +219,38 @@ struct CounterDetailContent: View {
             }
             .padding()
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            incrementAndRestartTiming()
-        }
-        .onLongPressGesture(minimumDuration: 0.35) {
-            endCurrentPhaseWithLongPress()
+        .overlay(alignment: .bottom) {
+            if isUndoVisible {
+                HStack(spacing: 12) {
+                    Text(undoBannerMessage)
+                        .font(.caption)
+                        .lineLimit(2)
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Button(undoButtonTitle) {
+                        undoLastIncrement()
+                    }
+                    .font(.caption.weight(.semibold))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color(UIColor.secondarySystemBackground))
+                        .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 4)
+                )
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
         .onAppear {
             resetPhaseTimer()
+            clearUndoState()
         }
         .onChange(of: counter.id) { _, _ in
             resetPhaseTimer()
+            clearUndoState()
         }
     }
     
@@ -208,7 +259,8 @@ struct CounterDetailContent: View {
         return phaseStartAt
     }
     
-    private func logDelta(_ delta: Int) {
+    @discardableResult
+    private func logDelta(_ delta: Int) -> CounterLog {
         let newLog = CounterLog(delta: delta, item: counter)
         modelContext.insert(newLog)
         counter.logs.append(newLog)
@@ -217,6 +269,7 @@ struct CounterDetailContent: View {
             ScreenAwakeManager.shared.markCounterActivity()
             playIncrementFeedback()
         }
+        return newLog
     }
     
     private func startPhaseTimer() {
@@ -231,8 +284,16 @@ struct CounterDetailContent: View {
     }
     
     private func incrementAndRestartTiming() {
-        logDelta(1)
+        let previousIsPhaseTiming = isPhaseTiming
+        let previousPhaseStartAt = phaseStartAt
+        let newLog = logDelta(1)
         restartPhaseTimer()
+        showUndo(
+            for: newLog,
+            message: NSLocalizedString("Added +1", comment: ""),
+            wasPhaseTiming: previousIsPhaseTiming,
+            previousPhaseStartAt: previousPhaseStartAt
+        )
     }
     
     private func endCurrentPhaseWithLongPress() {
@@ -242,8 +303,16 @@ struct CounterDetailContent: View {
     }
     
     private func endPhase() {
-        logDelta(1)
+        let previousIsPhaseTiming = isPhaseTiming
+        let previousPhaseStartAt = phaseStartAt
+        let newLog = logDelta(1)
         resetPhaseTimer()
+        showUndo(
+            for: newLog,
+            message: NSLocalizedString("Ended and added +1", comment: ""),
+            wasPhaseTiming: previousIsPhaseTiming,
+            previousPhaseStartAt: previousPhaseStartAt
+        )
     }
     
     private func startNextPhaseWithoutCount() {
@@ -274,6 +343,64 @@ struct CounterDetailContent: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
             isStartButtonPulsing = false
         }
+    }
+    
+    private func showUndo(for log: CounterLog, message: String, wasPhaseTiming: Bool, previousPhaseStartAt: Date?) {
+        pruneExpiredUndoActions()
+        pendingUndoActions.append(PendingUndoAction(
+            log: log,
+            message: message,
+            wasPhaseTiming: wasPhaseTiming,
+            previousPhaseStartAt: previousPhaseStartAt,
+            createdAt: Date()
+        ))
+        withAnimation(.easeOut(duration: 0.2)) {
+            isUndoVisible = true
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + undoRetentionSeconds) {
+            pruneExpiredUndoActions()
+        }
+    }
+    
+    private func undoLastIncrement() {
+        pruneExpiredUndoActions()
+        guard let action = pendingUndoActions.popLast() else { return }
+        counter.logs.removeAll { $0.id == action.log.id }
+        modelContext.delete(action.log)
+        isPhaseTiming = action.wasPhaseTiming
+        phaseStartAt = action.previousPhaseStartAt
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        if pendingUndoActions.isEmpty {
+            withAnimation(.easeOut(duration: 0.2)) {
+                isUndoVisible = false
+            }
+        }
+    }
+    
+    private func clearUndoState() {
+        pendingUndoActions.removeAll()
+        withAnimation(.easeOut(duration: 0.2)) {
+            isUndoVisible = false
+        }
+    }
+    
+    private func pruneExpiredUndoActions() {
+        let now = Date()
+        pendingUndoActions.removeAll { now.timeIntervalSince($0.createdAt) > undoRetentionSeconds }
+        if pendingUndoActions.isEmpty, isUndoVisible {
+            withAnimation(.easeOut(duration: 0.2)) {
+                isUndoVisible = false
+            }
+        }
+    }
+    
+    private var undoBannerMessage: String {
+        pendingUndoActions.last?.message ?? ""
+    }
+    
+    private var undoButtonTitle: String {
+        "Undo"
     }
     
     private func formatElapsedTime(since start: Date?, now: Date) -> String {

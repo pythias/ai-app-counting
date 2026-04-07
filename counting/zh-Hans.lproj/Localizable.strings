@@ -42,6 +42,10 @@
 "Paused" = "已暂停";
 "Start Next (+0)" = "开始下一次（+0）";
 "Long Press ends current timing (+1)" = "长按结束当前计时（+1）";
+"Added +1" = "已加 1";
+"Ended and added +1" = "已结束并加 1";
+"Undo" = "撤销";
+"Tap to confirm reset" = "点击确认重置";
 "Since Last +1" = "距上次 +1";
 "My Counter" = "我的计数器";
 

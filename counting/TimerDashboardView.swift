@@ -24,6 +24,8 @@ struct TimerDashboardView: View {
     @State private var showingTimerStats = false
     @State private var selectedStyleIndex = 0
     @State private var isTimePulsing = false
+    @State private var isResetConfirmVisible = false
+    @State private var resetConfirmTask: DispatchWorkItem?
     
     let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
     
@@ -71,13 +73,6 @@ struct TimerDashboardView: View {
                 .padding(44)
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                toggleTimer()
-            }
-            .onLongPressGesture(minimumDuration: 0.35) {
-                resetTimer()
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -144,20 +139,7 @@ struct TimerDashboardView: View {
     }
     
     private func toggleTimer() {
-        if isRunning {
-            let activeItem = selectedTimer
-            let session = TimerSession(
-                title: activeItem?.name ?? activeTimerTitle,
-                startTime: startTime ?? Date(),
-                duration: timeElapsed,
-                item: activeItem
-            )
-            modelContext.insert(session)
-            ScreenAwakeManager.shared.markTimerStopped()
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            isRunning = false
-            timeElapsed = 0
-        } else {
+        if !isRunning {
             ensureDefaultTimer()
             startTime = Date()
             ScreenAwakeManager.shared.markTimerStarted()
@@ -167,12 +149,31 @@ struct TimerDashboardView: View {
         }
     }
     
+    private func stopTimer() {
+        guard isRunning else { return }
+        let activeItem = selectedTimer
+        let session = TimerSession(
+            title: activeItem?.name ?? activeTimerTitle,
+            startTime: startTime ?? Date(),
+            duration: timeElapsed,
+            item: activeItem
+        )
+        modelContext.insert(session)
+        ScreenAwakeManager.shared.markTimerStopped()
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        isRunning = false
+        timeElapsed = 0
+    }
+    
     private func resetTimer() {
         ScreenAwakeManager.shared.markTimerStopped()
         UINotificationFeedbackGenerator().notificationOccurred(.warning)
         isRunning = false
         timeElapsed = 0
         startTime = nil
+        isResetConfirmVisible = false
+        resetConfirmTask?.cancel()
+        resetConfirmTask = nil
     }
     
     @ViewBuilder
@@ -186,10 +187,28 @@ struct TimerDashboardView: View {
                     .minimumScaleFactor(0.55)
                     .scaleEffect(isTimePulsing ? 1.04 : 1.0)
                     .animation(.spring(response: 0.22, dampingFraction: 0.6), value: isTimePulsing)
+                if isResetConfirmVisible {
+                    Text("Tap to confirm reset")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.orange)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(20)
             .background(cardBackground)
+            .contentShape(RoundedRectangle(cornerRadius: 32))
+            .simultaneousGesture(
+                TapGesture()
+                    .onEnded {
+                        handleTimerCardTap()
+                    }
+            )
+            .highPriorityGesture(
+                LongPressGesture(minimumDuration: 0.35)
+                    .onEnded { _ in
+                        handleTimerCardLongPress()
+                    }
+            )
         case .clock:
             VStack(spacing: 14) {
                 ZStack {
@@ -205,10 +224,28 @@ struct TimerDashboardView: View {
                 Text(formatTime(timeElapsed))
                     .font(.system(.title3, design: .monospaced))
                     .foregroundColor(.secondary)
+                if isResetConfirmVisible {
+                    Text("Tap to confirm reset")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.orange)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(20)
             .background(cardBackground)
+            .contentShape(RoundedRectangle(cornerRadius: 32))
+            .simultaneousGesture(
+                TapGesture()
+                    .onEnded {
+                        handleTimerCardTap()
+                    }
+            )
+            .highPriorityGesture(
+                LongPressGesture(minimumDuration: 0.35)
+                    .onEnded { _ in
+                        handleTimerCardLongPress()
+                    }
+            )
         }
     }
     
@@ -253,6 +290,38 @@ struct TimerDashboardView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
             isTimePulsing = false
         }
+    }
+    
+    private func handleTimerCardTap() {
+        if isResetConfirmVisible {
+            resetTimer()
+            return
+        }
+        if !isRunning {
+            toggleTimer()
+        }
+    }
+    
+    private func handleTimerCardLongPress() {
+        if isRunning {
+            stopTimer()
+            return
+        }
+        guard timeElapsed > 0 else { return }
+        armResetConfirmation()
+    }
+    
+    private func armResetConfirmation() {
+        resetConfirmTask?.cancel()
+        isResetConfirmVisible = true
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        
+        let task = DispatchWorkItem {
+            isResetConfirmVisible = false
+            resetConfirmTask = nil
+        }
+        resetConfirmTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: task)
     }
     
     private func formatTime(_ time: TimeInterval) -> String {
